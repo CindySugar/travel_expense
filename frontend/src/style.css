@@ -56,6 +56,25 @@ textarea:disabled {
   min-height: 100svh;
 }
 
+.app-shell,
+.auth-layout,
+.topbar,
+.workspace,
+.side-panel,
+.detail-area,
+.detail-grid,
+.metric-grid,
+.form-grid,
+.inline-form,
+.panel,
+.metric-card,
+.wide,
+.expense-panel,
+.table-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .app-shell {
   width: min(1440px, calc(100% - 32px));
   min-height: 100svh;
@@ -75,9 +94,20 @@ textarea:disabled {
 .auth-copy h2,
 .panel h2,
 .panel h3,
-.trip-header h2 {
+.trip-header h2,
+.trip-item span,
+.trip-item small,
+.member-list small,
+.expense-panel small,
+td,
+.summary-list small,
+.settlement-list small,
+.metric-card strong,
+.split-chip,
+.net-pill {
   margin: 0;
   letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 .topbar h1 {
@@ -102,6 +132,17 @@ textarea:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.user-box > *,
+.header-actions > *,
+.section-head > *,
+.panel-heading > *,
+.trip-header > *,
+.member-list li > *,
+.summary-list li > *,
+.settlement-list li > * {
+  min-width: 0;
 }
 
 .user-box {
@@ -521,7 +562,10 @@ textarea:focus {
 }
 
 .table-wrap {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -629,10 +673,23 @@ th {
     align-items: stretch;
   }
 
+  .workspace,
+  .side-panel,
+  .detail-area,
+  .metric-grid,
+  .detail-grid,
+  .wide,
+  .expense-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .primary-button,
   .secondary-button,
   .ghost-button,
   .danger-button {
     width: 100%;
+    white-space: normal;
   }
 }
