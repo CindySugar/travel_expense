@@ -1,20 +1,19 @@
 :root {
-  --bg: #eef2f7;
+  --bg: #f5f2eb;
   --surface: rgba(255, 255, 255, 0.9);
   --surface-strong: rgba(255, 255, 255, 0.98);
-  --text: #17212b;
-  --muted: #61707f;
-  --line: #d8e0e8;
-  --line-strong: #c8d1db;
-  --primary: #243447;
-  --primary-strong: #182432;
-  --primary-soft: #e9eff7;
-  --accent: #4e74a1;
-  --danger: #b54d47;
+  --text: #1f2730;
+  --muted: #64707c;
+  --line: #d8dfe6;
+  --line-strong: #c5ced7;
+  --primary: #24313f;
+  --primary-strong: #17202a;
+  --primary-soft: #ebf1f7;
+  --danger: #b95348;
   --danger-soft: #fff1ef;
-  --success: #3e7251;
-  --success-soft: #eef7f1;
-  --shadow: 0 18px 44px rgba(33, 47, 64, 0.09);
+  --success: #42734e;
+  --success-soft: #edf7ef;
+  --shadow: 0 18px 42px rgba(34, 42, 52, 0.08);
   font: 15px/1.55 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -38,8 +37,8 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    radial-gradient(circle at 20px 20px, rgba(118, 144, 183, 0.13) 1.5px, transparent 2px) 0 0 / 48px 48px,
-    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    radial-gradient(circle at 20px 20px, rgba(215, 184, 141, 0.16) 1.5px, transparent 2px) 0 0 / 48px 48px,
+    linear-gradient(180deg, #faf7f1 0%, #f5f2eb 100%);
   overflow-x: hidden;
 }
 
@@ -270,10 +269,6 @@ textarea:disabled {
   align-items: start;
 }
 
-.workspace--list {
-  grid-template-columns: minmax(320px, 384px) minmax(0, 1fr);
-}
-
 .side-panel {
   position: sticky;
   top: 16px;
@@ -329,14 +324,12 @@ textarea:disabled {
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(249, 251, 253, 0.94));
   box-shadow: 0 12px 24px rgba(34, 42, 52, 0.06);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .trip-card:hover,
 .trip-card.active {
   border-color: rgba(36, 49, 63, 0.22);
-  transform: translateY(-2px);
-  box-shadow: 0 16px 30px rgba(34, 42, 52, 0.1);
+  transform: translateY(-1px);
 }
 
 .trip-card strong {
@@ -463,52 +456,6 @@ textarea:disabled {
 .detail-area {
   display: grid;
   gap: 18px;
-}
-
-.detail-page {
-  display: grid;
-  gap: 18px;
-}
-
-.detail-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 24px 26px;
-  border: 1px solid rgba(213, 221, 230, 0.95);
-  border-radius: 30px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 244, 249, 0.96)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
-  box-shadow: var(--shadow);
-}
-
-.detail-hero__copy {
-  min-width: 0;
-  display: grid;
-  gap: 10px;
-}
-
-.detail-hero__copy h2 {
-  margin: 0;
-  font-size: clamp(28px, 3.2vw, 42px);
-  line-height: 1.08;
-  font-weight: 900;
-}
-
-.detail-hero__copy p {
-  margin: 0;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.detail-back {
-  width: fit-content;
-}
-
-.detail-actions {
-  flex-shrink: 0;
 }
 
 .trip-header {
@@ -674,16 +621,6 @@ textarea:focus {
 
 .primary-button:hover {
   background: var(--primary-strong);
-}
-
-.primary-button:focus-visible,
-.secondary-button:focus-visible,
-.ghost-button:focus-visible,
-.danger-button:focus-visible,
-.text-button:focus-visible,
-.trip-card:focus-visible {
-  outline: 2px solid rgba(78, 116, 161, 0.35);
-  outline-offset: 2px;
 }
 
 .secondary-button,
@@ -858,14 +795,6 @@ tbody tr:nth-child(even) td {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .detail-hero {
-    flex-direction: column;
-  }
-
-  .detail-actions {
-    width: 100%;
-  }
 }
 
 @media (max-width: 760px) {
@@ -904,14 +833,12 @@ tbody tr:nth-child(even) td {
   .metric-grid,
   .form-grid.two,
   .form-grid.three,
-  .inline-form,
-  .detail-hero {
+  .inline-form {
     grid-template-columns: 1fr;
   }
 
   .panel,
   .trip-header,
-  .detail-hero,
   .create-trip,
   .metric-card,
   .trip-card {
@@ -920,7 +847,6 @@ tbody tr:nth-child(even) td {
 
   .trip-header,
   .header-actions,
-  .detail-actions,
   .member-list li,
   .summary-list li,
   .settlement-list li {

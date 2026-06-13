@@ -13,8 +13,6 @@ const sessionLoading = ref(true);
 const user = ref(null);
 const trips = ref([]);
 const selectedTrip = ref(null);
-const routeTripId = ref(null);
-const viewMode = ref('list');
 const members = ref([]);
 const expenses = ref([]);
 const summary = ref(null);
@@ -45,42 +43,9 @@ const editTripForm = reactive({
 
 const isBusy = computed(() => Boolean(busy.value));
 const selectedTripId = computed(() => selectedTrip.value?.id || null);
-const isDetailView = computed(() => viewMode.value === 'detail');
 const summaryMembers = computed(() => summary.value?.members || []);
 const totalAmount = computed(() => summary.value?.total || '0.00');
 const perPersonAmount = computed(() => summary.value?.per_person || '0.00');
-
-function getTripIdFromHash() {
-  const match = window.location.hash.match(/^#\/trips\/(\d+)$/);
-  return match ? Number(match[1]) : null;
-}
-
-async function syncRouteToSelection() {
-  const tripId = getTripIdFromHash();
-  routeTripId.value = tripId;
-  if (!tripId) {
-    viewMode.value = 'list';
-    return;
-  }
-
-  viewMode.value = 'detail';
-  const existingTrip = trips.value.find((trip) => trip.id === tripId);
-  if (existingTrip) {
-    applyTripSelection(existingTrip);
-    await refreshTripData();
-    return;
-  }
-
-  if (!user.value) return;
-
-  const payload = await api.getTrip(tripId);
-  applyTripSelection(payload.trip);
-  await refreshTripData();
-}
-
-function goToTripList() {
-  window.location.hash = '#/trips';
-}
 
 function stopMessageTimers() {
   if (messageHideTimer) {
@@ -276,7 +241,6 @@ async function loadSession() {
     user.value = payload.authenticated ? payload.user : null;
     if (user.value) {
       await loadTrips();
-      await syncRouteToSelection();
     }
   } catch (error) {
     setMessage('error', error.message || '无法连接后端服务');
@@ -300,13 +264,10 @@ async function logout() {
   user.value = null;
   trips.value = [];
   selectedTrip.value = null;
-  routeTripId.value = null;
-  viewMode.value = 'list';
   members.value = [];
   expenses.value = [];
   summary.value = null;
   settlements.value = [];
-  window.location.hash = '#/trips';
 }
 
 async function loadTrips() {
@@ -335,8 +296,6 @@ async function loadTrips() {
       selectedTrip.value = stillSelected;
     } else {
       selectedTrip.value = null;
-      routeTripId.value = null;
-      viewMode.value = 'list';
       members.value = [];
       expenses.value = [];
       summary.value = null;
@@ -350,7 +309,7 @@ async function createTrip() {
   if (!payload) return;
   resetTripForm();
   await loadTrips();
-  window.location.hash = `#/trips/${payload.trip.id}`;
+  await openTrip(payload.trip);
 }
 
 async function refreshTripData() {
@@ -375,9 +334,6 @@ async function refreshTripData() {
 
 async function openTrip(trip) {
   applyTripSelection(trip);
-  routeTripId.value = trip.id;
-  viewMode.value = 'detail';
-  window.location.hash = `#/trips/${trip.id}`;
   await refreshTripData();
 }
 
@@ -395,13 +351,10 @@ async function deleteTrip() {
   const deleted = await runTask('删除中', () => api.deleteTrip(selectedTripId.value), '已删除出行');
   if (!deleted) return;
   selectedTrip.value = null;
-  routeTripId.value = null;
-  viewMode.value = 'list';
   members.value = [];
   expenses.value = [];
   summary.value = null;
   settlements.value = [];
-  window.location.hash = '#/trips';
   await loadTrips();
 }
 
@@ -549,13 +502,7 @@ function tripDisplayMembers(trip) {
 }
 
 onMounted(loadSession);
-onMounted(() => {
-  window.addEventListener('hashchange', syncRouteToSelection);
-});
-onUnmounted(() => {
-  window.removeEventListener('hashchange', syncRouteToSelection);
-  stopMessageTimers();
-});
+onUnmounted(stopMessageTimers);
 </script>
 
 <template>
@@ -615,7 +562,7 @@ onUnmounted(() => {
       </section>
     </main>
 
-    <main v-else-if="!isDetailView" class="workspace workspace--list">
+    <main v-else class="workspace">
       <section class="panel side-panel" aria-label="出行列表">
         <div class="panel-heading">
           <div>
@@ -712,252 +659,256 @@ onUnmounted(() => {
           </button>
         </div>
       </section>
-    </main>
 
-    <main v-else class="detail-page">
-      <section class="detail-hero">
-        <div class="detail-hero__copy">
-          <button class="ghost-button detail-back" type="button" :disabled="isBusy" @click="goToTripList">返回列表</button>
-          <p class="eyebrow">{{ selectedTrip?.location || '未设置地点' }}</p>
-          <h2>{{ selectedTrip?.title }}</h2>
-          <p>
-            {{ splitDateRange(selectedTrip) }} · {{ selectedTrip?.currency || 'CNY' }} ·
-            {{ formatUpdatedLine(selectedTrip?.last_updated_at) }}
-          </p>
-        </div>
-        <div class="header-actions detail-actions">
-          <button class="ghost-button" type="button" :disabled="isBusy" @click="refreshTripData">刷新详情</button>
-          <button class="danger-button" type="button" :disabled="isBusy" @click="deleteTrip">删除出行</button>
-        </div>
+      <section v-if="!selectedTrip" class="panel detail-placeholder">
+        <h2>点击一个出行卡片查看详情</h2>
+        <p>详情页会提供成员、账单和结算操作；首页只保留创建与浏览。</p>
       </section>
 
-      <section class="metric-grid">
-        <article class="metric-card">
-          <span>总花费</span>
-          <strong>{{ formatCurrency(totalAmount) }}</strong>
-        </article>
-        <article class="metric-card">
-          <span>人均</span>
-          <strong>{{ formatCurrency(perPersonAmount) }}</strong>
-        </article>
-        <article class="metric-card">
-          <span>成员</span>
-          <strong>{{ members.length }} 人</strong>
-        </article>
-        <article class="metric-card">
-          <span>账单</span>
-          <strong>{{ expenses.length }} 笔</strong>
-        </article>
-      </section>
-
-      <section class="detail-grid">
-        <section class="panel" aria-labelledby="trip-edit-title">
-          <h3 id="trip-edit-title">出行信息</h3>
-          <form class="form-stack" @submit.prevent="updateTrip">
-            <label>
-              名称
-              <input v-model.trim="editTripForm.title" required />
-            </label>
-            <label>
-              地点
-              <input v-model.trim="editTripForm.location" />
-            </label>
-            <div class="form-grid two">
-              <label>
-                开始日期
-                <input v-model="editTripForm.start_date" type="date" />
-              </label>
-              <label>
-                结束日期
-                <input v-model="editTripForm.end_date" type="date" />
-              </label>
-            </div>
-            <label>
-              备注
-              <textarea v-model.trim="editTripForm.note" rows="3"></textarea>
-            </label>
-            <button class="secondary-button" type="submit" :disabled="isBusy">保存出行信息</button>
-          </form>
-        </section>
-
-        <section class="panel" aria-labelledby="member-title">
-          <div class="section-head">
-            <h3 id="member-title">成员管理</h3>
-            <span>{{ members.length }} 人</span>
+      <section v-else class="detail-area" aria-label="出行详情">
+        <div class="panel trip-header">
+          <div>
+            <p class="eyebrow">{{ selectedTrip.location || '未设置地点' }}</p>
+            <h2>{{ selectedTrip.title }}</h2>
+            <p>
+              {{ splitDateRange(selectedTrip) }} · {{ selectedTrip.currency }} ·
+              {{ formatUpdatedLine(selectedTrip.last_updated_at) }}
+            </p>
           </div>
-          <form class="inline-form" @submit.prevent="addMember">
-            <label>
-              昵称
-              <input v-model.trim="memberForm.display_name" placeholder="Bob" required />
-            </label>
-            <label>
-              关联用户名
-              <input v-model.trim="memberForm.username" placeholder="可选" />
-            </label>
-            <button class="secondary-button" type="submit" :disabled="isBusy">添加</button>
-          </form>
-          <ul class="member-list" aria-label="成员列表">
-            <li v-for="member in members" :key="member.id">
-              <div class="member-meta">
-                <span class="member-avatar" :style="avatarStyle(member.display_name || member.username, member.id)">
-                  {{ avatarLabel(member.display_name || member.username) }}
-                </span>
-                <div>
-                  <strong>{{ member.display_name }}</strong>
-                  <small>{{ member.username ? `已关联 ${member.username}` : '临时昵称成员' }}</small>
+          <div class="header-actions">
+            <button class="ghost-button" type="button" :disabled="isBusy" @click="refreshTripData">刷新详情</button>
+            <button class="danger-button" type="button" :disabled="isBusy" @click="deleteTrip">删除出行</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card">
+            <span>总花费</span>
+            <strong>{{ formatCurrency(totalAmount) }}</strong>
+          </article>
+          <article class="metric-card">
+            <span>人均</span>
+            <strong>{{ formatCurrency(perPersonAmount) }}</strong>
+          </article>
+          <article class="metric-card">
+            <span>成员</span>
+            <strong>{{ members.length }} 人</strong>
+          </article>
+          <article class="metric-card">
+            <span>账单</span>
+            <strong>{{ expenses.length }} 笔</strong>
+          </article>
+        </div>
+
+        <div class="detail-grid">
+          <section class="panel" aria-labelledby="trip-edit-title">
+            <h3 id="trip-edit-title">出行信息</h3>
+            <form class="form-stack" @submit.prevent="updateTrip">
+              <label>
+                名称
+                <input v-model.trim="editTripForm.title" required />
+              </label>
+              <label>
+                地点
+                <input v-model.trim="editTripForm.location" />
+              </label>
+              <div class="form-grid two">
+                <label>
+                  开始日期
+                  <input v-model="editTripForm.start_date" type="date" />
+                </label>
+                <label>
+                  结束日期
+                  <input v-model="editTripForm.end_date" type="date" />
+                </label>
+              </div>
+              <label>
+                备注
+                <textarea v-model.trim="editTripForm.note" rows="3"></textarea>
+              </label>
+              <button class="secondary-button" type="submit" :disabled="isBusy">保存出行信息</button>
+            </form>
+          </section>
+
+          <section class="panel" aria-labelledby="member-title">
+            <div class="section-head">
+              <h3 id="member-title">成员管理</h3>
+              <span>{{ members.length }} 人</span>
+            </div>
+            <form class="inline-form" @submit.prevent="addMember">
+              <label>
+                昵称
+                <input v-model.trim="memberForm.display_name" placeholder="Bob" required />
+              </label>
+              <label>
+                关联用户名
+                <input v-model.trim="memberForm.username" placeholder="可选" />
+              </label>
+              <button class="secondary-button" type="submit" :disabled="isBusy">添加</button>
+            </form>
+            <ul class="member-list" aria-label="成员列表">
+              <li v-for="member in members" :key="member.id">
+                <div class="member-meta">
+                  <span class="member-avatar" :style="avatarStyle(member.display_name || member.username, member.id)">
+                    {{ avatarLabel(member.display_name || member.username) }}
+                  </span>
+                  <div>
+                    <strong>{{ member.display_name }}</strong>
+                    <small>{{ member.username ? `已关联 ${member.username}` : '临时昵称成员' }}</small>
+                  </div>
                 </div>
-              </div>
-              <button class="text-button" type="button" :disabled="isBusy" @click="deleteMember(member)">删除</button>
-            </li>
-          </ul>
-        </section>
+                <button class="text-button" type="button" :disabled="isBusy" @click="deleteMember(member)">删除</button>
+              </li>
+            </ul>
+          </section>
 
-        <section class="panel expense-panel" aria-labelledby="expense-title">
-          <div class="section-head">
-            <h3 id="expense-title">账单录入</h3>
-            <button class="ghost-button" type="button" :disabled="isBusy || members.length < 3" @click="createDemoBills">
-              生成 5 笔示例
-            </button>
-          </div>
-          <form class="form-stack" @submit.prevent="addExpense">
-            <div class="form-grid three">
-              <label>
-                金额
-                <input v-model="expenseForm.amount" inputmode="decimal" placeholder="90.00" required />
-              </label>
-              <label>
-                付款人
-                <select v-model="expenseForm.payer_id" required>
-                  <option value="" disabled>选择付款人</option>
-                  <option v-for="member in members" :key="member.id" :value="member.id">
-                    {{ member.display_name }}
-                  </option>
-                </select>
-              </label>
-              <label>
-                日期
-                <input v-model="expenseForm.spent_at" type="date" required />
-              </label>
-            </div>
-            <div class="form-grid two">
-              <label>
-                分类
-                <input v-model.trim="expenseForm.category" placeholder="餐饮" />
-              </label>
-              <label>
-                说明
-                <input v-model.trim="expenseForm.description" placeholder="午餐、门票、打车..." />
-              </label>
-            </div>
-            <fieldset class="checkbox-group">
-              <legend>参与分摊成员</legend>
-              <label v-for="member in members" :key="member.id">
-                <input
-                  type="checkbox"
-                  :checked="expenseForm.split_member_ids.includes(member.id)"
-                  @change="toggleSplitMember(member.id, $event.target.checked)"
-                />
-                {{ member.display_name }}
-              </label>
-            </fieldset>
-            <button class="primary-button" type="submit" :disabled="isBusy || !canCreateExpense">
-              添加账单
-            </button>
-          </form>
-        </section>
-
-        <section class="panel wide" aria-labelledby="expense-list-title">
-          <div class="section-head">
-            <h3 id="expense-list-title">账单明细</h3>
-            <span>{{ expenses.length }} 笔</span>
-          </div>
-          <div v-if="!expenses.length" class="empty-state compact">
-            <strong>暂无账单</strong>
-            <p>录入账单后，汇总和结算建议会自动更新。</p>
-          </div>
-          <div v-else class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>日期</th>
-                  <th>说明</th>
-                  <th>付款人</th>
-                  <th>金额</th>
-                  <th>分摊</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="expense in expenses" :key="expense.id">
-                  <td>{{ expense.spent_at }}</td>
-                  <td>
-                    <strong>{{ expense.description || expense.category }}</strong>
-                    <small>{{ expense.category }}</small>
-                  </td>
-                  <td>{{ expense.payer_name }}</td>
-                  <td>{{ formatCurrency(expense.amount) }}</td>
-                  <td>
-                    <span v-for="split in expense.splits" :key="split.member_id" class="split-chip">
-                      {{ split.display_name }} {{ formatCurrency(split.amount) }}
-                    </span>
-                  </td>
-                  <td>
-                    <button class="text-button danger-text" type="button" :disabled="isBusy" @click="deleteExpense(expense)">
-                      删除
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="panel" aria-labelledby="summary-title">
-          <div class="section-head">
-            <h3 id="summary-title">成员汇总</h3>
-            <span>净额 = 已付 - 应摊</span>
-          </div>
-          <div v-if="!summaryMembers.length" class="empty-state compact">
-            <strong>暂无汇总</strong>
-            <p>添加成员和账单后自动计算。</p>
-          </div>
-          <ul v-else class="summary-list">
-            <li v-for="row in summaryMembers" :key="row.member_id">
-              <div>
-                <strong>{{ row.display_name }}</strong>
-                <small>已付 {{ formatCurrency(row.paid) }} · 应摊 {{ formatCurrency(row.share) }}</small>
-              </div>
-              <span class="net-pill" :class="directionClass(row.direction)">
-                {{ directionText(row.direction) }} {{ formatCurrency(Math.abs(Number(row.net || 0))) }}
-              </span>
-            </li>
-          </ul>
-        </section>
-
-        <section class="panel" aria-labelledby="settlement-title">
-          <div class="section-head">
-            <h3 id="settlement-title">结算建议</h3>
-            <span>{{ settlements.length }} 条</span>
-          </div>
-          <div v-if="!settlements.length" class="empty-state compact">
-            <strong>当前无需转账</strong>
-            <p>所有成员已平或还没有账单。</p>
-          </div>
-          <ul v-else class="settlement-list">
-            <li v-for="settlement in settlements" :key="settlement.id" :class="{ paid: settlement.is_paid }">
-              <div>
-                <strong>
-                  {{ settlement.from_member_name }} 转 {{ settlement.to_member_name }}
-                  {{ formatCurrency(settlement.amount) }}
-                </strong>
-                <small>{{ settlement.is_paid ? '已结清' : '待结清' }}</small>
-              </div>
-              <button class="secondary-button" type="button" :disabled="isBusy" @click="toggleSettlement(settlement)">
-                {{ settlement.is_paid ? '标记未结' : '标记结清' }}
+          <section class="panel expense-panel" aria-labelledby="expense-title">
+            <div class="section-head">
+              <h3 id="expense-title">账单录入</h3>
+              <button class="ghost-button" type="button" :disabled="isBusy || members.length < 3" @click="createDemoBills">
+                生成 5 笔示例
               </button>
-            </li>
-          </ul>
-        </section>
+            </div>
+            <form class="form-stack" @submit.prevent="addExpense">
+              <div class="form-grid three">
+                <label>
+                  金额
+                  <input v-model="expenseForm.amount" inputmode="decimal" placeholder="90.00" required />
+                </label>
+                <label>
+                  付款人
+                  <select v-model="expenseForm.payer_id" required>
+                    <option value="" disabled>选择付款人</option>
+                    <option v-for="member in members" :key="member.id" :value="member.id">
+                      {{ member.display_name }}
+                    </option>
+                  </select>
+                </label>
+                <label>
+                  日期
+                  <input v-model="expenseForm.spent_at" type="date" required />
+                </label>
+              </div>
+              <div class="form-grid two">
+                <label>
+                  分类
+                  <input v-model.trim="expenseForm.category" placeholder="餐饮" />
+                </label>
+                <label>
+                  说明
+                  <input v-model.trim="expenseForm.description" placeholder="午餐、门票、打车..." />
+                </label>
+              </div>
+              <fieldset class="checkbox-group">
+                <legend>参与分摊成员</legend>
+                <label v-for="member in members" :key="member.id">
+                  <input
+                    type="checkbox"
+                    :checked="expenseForm.split_member_ids.includes(member.id)"
+                    @change="toggleSplitMember(member.id, $event.target.checked)"
+                  />
+                  {{ member.display_name }}
+                </label>
+              </fieldset>
+              <button class="primary-button" type="submit" :disabled="isBusy || !canCreateExpense">
+                添加账单
+              </button>
+            </form>
+          </section>
+
+          <section class="panel wide" aria-labelledby="expense-list-title">
+            <div class="section-head">
+              <h3 id="expense-list-title">账单明细</h3>
+              <span>{{ expenses.length }} 笔</span>
+            </div>
+            <div v-if="!expenses.length" class="empty-state compact">
+              <strong>暂无账单</strong>
+              <p>录入账单后，汇总和结算建议会自动更新。</p>
+            </div>
+            <div v-else class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>日期</th>
+                    <th>说明</th>
+                    <th>付款人</th>
+                    <th>金额</th>
+                    <th>分摊</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="expense in expenses" :key="expense.id">
+                    <td>{{ expense.spent_at }}</td>
+                    <td>
+                      <strong>{{ expense.description || expense.category }}</strong>
+                      <small>{{ expense.category }}</small>
+                    </td>
+                    <td>{{ expense.payer_name }}</td>
+                    <td>{{ formatCurrency(expense.amount) }}</td>
+                    <td>
+                      <span v-for="split in expense.splits" :key="split.member_id" class="split-chip">
+                        {{ split.display_name }} {{ formatCurrency(split.amount) }}
+                      </span>
+                    </td>
+                    <td>
+                      <button class="text-button danger-text" type="button" :disabled="isBusy" @click="deleteExpense(expense)">
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="summary-title">
+            <div class="section-head">
+              <h3 id="summary-title">成员汇总</h3>
+              <span>净额 = 已付 - 应摊</span>
+            </div>
+            <div v-if="!summaryMembers.length" class="empty-state compact">
+              <strong>暂无汇总</strong>
+              <p>添加成员和账单后自动计算。</p>
+            </div>
+            <ul v-else class="summary-list">
+              <li v-for="row in summaryMembers" :key="row.member_id">
+                <div>
+                  <strong>{{ row.display_name }}</strong>
+                  <small>已付 {{ formatCurrency(row.paid) }} · 应摊 {{ formatCurrency(row.share) }}</small>
+                </div>
+                <span class="net-pill" :class="directionClass(row.direction)">
+                  {{ directionText(row.direction) }} {{ formatCurrency(Math.abs(Number(row.net || 0))) }}
+                </span>
+              </li>
+            </ul>
+          </section>
+
+          <section class="panel" aria-labelledby="settlement-title">
+            <div class="section-head">
+              <h3 id="settlement-title">结算建议</h3>
+              <span>{{ settlements.length }} 条</span>
+            </div>
+            <div v-if="!settlements.length" class="empty-state compact">
+              <strong>当前无需转账</strong>
+              <p>所有成员已平或还没有账单。</p>
+            </div>
+            <ul v-else class="settlement-list">
+              <li v-for="settlement in settlements" :key="settlement.id" :class="{ paid: settlement.is_paid }">
+                <div>
+                  <strong>
+                    {{ settlement.from_member_name }} 转 {{ settlement.to_member_name }}
+                    {{ formatCurrency(settlement.amount) }}
+                  </strong>
+                  <small>{{ settlement.is_paid ? '已结清' : '待结清' }}</small>
+                </div>
+                <button class="secondary-button" type="button" :disabled="isBusy" @click="toggleSettlement(settlement)">
+                  {{ settlement.is_paid ? '标记未结' : '标记结清' }}
+                </button>
+              </li>
+            </ul>
+          </section>
+        </div>
       </section>
     </main>
   </div>

@@ -1,0 +1,21 @@
+const { spawn } = require('node:child_process');
+const path = require('node:path');
+
+const codexJs = path.join(
+  process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming'),
+  'npm',
+  'node_modules',
+  '@openai',
+  'codex',
+  'bin',
+  'codex.js'
+);
+
+const child = spawn(process.execPath, [codexJs, 'app-server', ...process.argv.slice(2)], {
+  stdio: 'inherit'
+});
+
+child.on('exit', (code, signal) => {
+  if (signal) process.kill(process.pid, signal);
+  process.exit(code ?? 1);
+});
