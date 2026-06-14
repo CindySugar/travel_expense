@@ -30,6 +30,10 @@ def patch_json(client, path, payload):
     return client.patch(path, data=json.dumps(payload), content_type="application/json")
 
 
+def bearer_client(token):
+    return Client(HTTP_HOST="127.0.0.1", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+
 def register(client, username, password="pass12345"):
     return assert_status(post_json(client, "/api/auth/register/", {"username": username, "password": password}), 201, "register")
 
@@ -42,6 +46,20 @@ def main():
     stranger = Client(HTTP_HOST="127.0.0.1")
 
     try:
+        wx_login = assert_status(
+            post_json(owner, "/api/auth/wechat-login/", {"code": f"mock:{suffix}"}),
+            200,
+            "wechat login",
+        )
+        wx_client = bearer_client(wx_login["token"])
+        wx_trip = assert_status(
+            post_json(wx_client, "/api/trips/", {"title": f"wechat trip {suffix}", "currency": "CNY"}),
+            201,
+            "create trip by bearer token",
+        )["trip"]
+        assert_status(wx_client.get(f"/api/trips/{wx_trip['id']}/"), 200, "bearer token can access trip")
+        assert_status(wx_client.delete(f"/api/trips/{wx_trip['id']}/"), 200, "delete wx trip")
+
         register(owner, owner_username)
         trip = assert_status(
             post_json(

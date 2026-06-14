@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Expense, ExpenseSplit, Settlement, Trip, TripMember
+from .models import ApiToken, Expense, ExpenseSplit, Settlement, Trip, TripMember, WechatProfile
 
 
 class TripMemberInline(admin.TabularInline):
@@ -43,3 +43,15 @@ class ExpenseSplitAdmin(admin.ModelAdmin):
 class SettlementAdmin(admin.ModelAdmin):
     list_display = ('trip', 'from_member', 'to_member', 'amount', 'is_paid', 'paid_at')
     list_filter = ('is_paid',)
+
+
+@admin.register(WechatProfile)
+class WechatProfileAdmin(admin.ModelAdmin):
+    list_display = ('openid', 'user', 'created_at', 'updated_at')
+    search_fields = ('openid', 'user__username')
+
+
+@admin.register(ApiToken)
+class ApiTokenAdmin(admin.ModelAdmin):
+    list_display = ('user', 'label', 'created_at', 'last_used_at')
+    search_fields = ('user__username', 'label')

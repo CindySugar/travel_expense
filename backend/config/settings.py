@@ -28,6 +28,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
+WECHAT_APPID = os.environ.get('WECHAT_APPID', '')
+WECHAT_APPSECRET = os.environ.get('WECHAT_APPSECRET', '')
+WECHAT_LOGIN_MOCK_PREFIX = os.environ.get('WECHAT_LOGIN_MOCK_PREFIX', 'mock:')
+
 
 # Application definition
 

@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path('auth/register/', views.register_view),
     path('auth/login/', views.login_view),
+    path('auth/wechat-login/', views.wechat_login_view),
     path('auth/logout/', views.logout_view),
     path('auth/me/', views.me_view),
     path('trips/', views.trips_view),

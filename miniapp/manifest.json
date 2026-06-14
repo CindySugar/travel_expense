@@ -1,0 +1,14 @@
+{
+  "name": "旅行账本",
+  "appid": "__UNI__TRAVEL_LEDGER",
+  "description": "朋友结伴出游记账小程序",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": true
+    },
+    "usingComponents": true
+  }
+}

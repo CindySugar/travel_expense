@@ -1,0 +1,40 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "微信登录"
+      }
+    },
+    {
+      "path": "pages/trips/index",
+      "style": {
+        "navigationBarTitleText": "我的出行"
+      }
+    },
+    {
+      "path": "pages/trips/edit",
+      "style": {
+        "navigationBarTitleText": "出行信息"
+      }
+    },
+    {
+      "path": "pages/trips/detail",
+      "style": {
+        "navigationBarTitleText": "出行详情"
+      }
+    },
+    {
+      "path": "pages/expenses/edit",
+      "style": {
+        "navigationBarTitleText": "新增账单"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "旅行账本",
+    "navigationBarBackgroundColor": "#f6f7f2",
+    "backgroundColor": "#f6f7f2"
+  }
+}

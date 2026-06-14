@@ -1,0 +1,22 @@
+{
+  "name": "travel-ledger-miniapp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "^3.0.0-4070920251124001",
+    "@dcloudio/uni-app-plus": "^3.0.0-4070920251124001",
+    "@dcloudio/uni-components": "^3.0.0-4070920251124001",
+    "@dcloudio/uni-h5": "^3.0.0-4070920251124001",
+    "@dcloudio/uni-mp-weixin": "^3.0.0-4070920251124001",
+    "vue": "^3.5.34"
+  },
+  "devDependencies": {
+    "@dcloudio/vite-plugin-uni": "^3.0.0-4070920251124001",
+    "vite": "^8.0.12"
+  }
+}

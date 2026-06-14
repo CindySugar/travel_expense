@@ -1,23 +1,58 @@
 import json
+import hashlib
+import secrets
+import urllib.parse
+import urllib.request
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import Expense, Settlement, Trip, TripMember
+from .models import ApiToken, Expense, Settlement, Trip, TripMember, WechatProfile
 from .services import mark_settlement, money, rebuild_splits, sync_settlements, trip_card_summary, trip_summary
 
 User = get_user_model()
 
 
+def token_hash(raw_token):
+    return hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+
+
+def create_api_token(user, label='miniapp'):
+    raw_token = secrets.token_urlsafe(32)
+    ApiToken.objects.create(user=user, key_hash=token_hash(raw_token), label=label)
+    return raw_token
+
+
+def user_from_bearer_token(request):
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    raw_token = auth_header.removeprefix('Bearer ').strip()
+    if not raw_token:
+        return None
+    token = ApiToken.objects.select_related('user').filter(key_hash=token_hash(raw_token)).first()
+    if token is None:
+        return None
+    token.last_used_at = timezone.now()
+    token.save(update_fields=['last_used_at'])
+    return token.user
+
+
 def api_login_required(view_func):
     def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
+        if request.user.is_authenticated:
+            return view_func(request, *args, **kwargs)
+        token_user = user_from_bearer_token(request)
+        if token_user is None:
             return error('请先登录', 401)
+        request.user = token_user
         return view_func(request, *args, **kwargs)
 
     return wrapper
@@ -66,6 +101,62 @@ def validate_date_range(start_date, end_date):
 
 def user_payload(user):
     return {'id': user.id, 'username': user.username}
+
+
+def fetch_wechat_session(code):
+    mock_prefix = getattr(settings, 'WECHAT_LOGIN_MOCK_PREFIX', 'mock:')
+    if settings.DEBUG and code.startswith(mock_prefix):
+        openid = code.removeprefix(mock_prefix).strip()
+        if not openid:
+            raise ValueError('微信 code 不正确')
+        return {'openid': f'dev_{openid}', 'session_key': ''}
+
+    appid = getattr(settings, 'WECHAT_APPID', '')
+    secret = getattr(settings, 'WECHAT_APPSECRET', '')
+    if not appid or not secret:
+        raise ValueError('未配置微信 APPID/APPSECRET')
+
+    params = urllib.parse.urlencode(
+        {
+            'appid': appid,
+            'secret': secret,
+            'js_code': code,
+            'grant_type': 'authorization_code',
+        }
+    )
+    url = f'https://api.weixin.qq.com/sns/jscode2session?{params}'
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+    except OSError:
+        raise ValueError('微信登录服务暂不可用')
+
+    if payload.get('errcode'):
+        raise ValueError(payload.get('errmsg') or '微信登录失败')
+    if not payload.get('openid'):
+        raise ValueError('微信登录未返回 openid')
+    return payload
+
+
+def get_or_create_wechat_user(openid, session_key=''):
+    profile = WechatProfile.objects.select_related('user').filter(openid=openid).first()
+    if profile:
+        if session_key and profile.session_key != session_key:
+            profile.session_key = session_key
+            profile.save(update_fields=['session_key', 'updated_at'])
+        return profile.user
+
+    base_username = f'wx_{openid[-16:]}'
+    username = base_username[:150]
+    suffix = 1
+    while User.objects.filter(username=username).exists():
+        suffix += 1
+        username = f'{base_username[:140]}_{suffix}'[:150]
+
+    with transaction.atomic():
+        user = User.objects.create_user(username=username, password=secrets.token_urlsafe(24))
+        WechatProfile.objects.create(user=user, openid=openid, session_key=session_key or '')
+    return user
 
 
 def member_payload(member):
@@ -188,6 +279,23 @@ def login_view(request):
             return error('用户名或密码不正确', 401)
         login(request, user)
         return ok({'user': user_payload(user)})
+    except ValueError as exc:
+        return error(str(exc))
+
+
+@csrf_exempt
+def wechat_login_view(request):
+    if request.method != 'POST':
+        return error('只支持 POST', 405)
+    try:
+        body = parse_body(request)
+        code = (body.get('code') or '').strip()
+        if not code:
+            return error('微信 code 不能为空')
+        session = fetch_wechat_session(code)
+        user = get_or_create_wechat_user(session['openid'], session.get('session_key', ''))
+        token = create_api_token(user)
+        return ok({'user': user_payload(user), 'token': token})
     except ValueError as exc:
         return error(str(exc))
 
